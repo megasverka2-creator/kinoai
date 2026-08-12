@@ -173,3 +173,73 @@ Bular TZ da qolsin, lekin birinchi qurilishga kirmasin:
 - Branch va diff — versiya saqlansin, branch keyin
 - QC Supervisor 9 ta audit moduli — MVP'da odam qaraydi
 - To'liq dependency invalidation engine — hozircha oddiy bayroq mantiqi
+
+---
+
+# v0.3 — Telegram bot (TZ 20-bo'lim)
+
+## Ishga tushirish
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+python -m bot.main
+```
+
+`.env` bo'sh bo'lsa bot **demo rejimda** ishlaydi: haqiqiy LLM
+chaqirilmaydi, oqim/tugmalar/saqlash/bosqich qulfi bir tiyinsiz
+sinaladi. Faqat `TELEGRAM_BOT_TOKEN` majburiy.
+
+## Komandalar (TZ 20.2)
+
+| Komanda | Natija |
+|---|---|
+| `/start` | Studio kirish |
+| `/new` | Yangi loyiha wizard |
+| `/projects` | Loyihalar ro'yxati |
+| `/status` | Joriy bosqich va progress |
+| `/cost` | Loyiha xarajati |
+| `/settings` | Sifat rejimi |
+| `/export` | Phase 6 da |
+
+## Stage review tugmalari (TZ 20.3)
+
+Tasdiqlash va qulflash · AI bilan tahrir · Qayta yaratish ·
+Qo'lda kiritish · Versiyalar · Oldingi bosqich
+
+## MVP oqimi
+
+```
+brief -> producer -> screenwriter -> script_doctor -> cinematographer
+```
+
+Har bosqich natijasi versiya sifatida saqlanadi. Tasdiqlangan versiya
+**o'chirilmaydi** — tahrir yangi versiya yaratadi. Orqaga qaytish xavfsiz.
+
+## Agentlar (TZ 15)
+
+TZ dagi 19 tadan 4 tasi ishlaydi:
+
+| Agent | O'zgartira olmaydigan master |
+|---|---|
+| Creative Producer | Original idea / Must Keep |
+| Screenwriter | Locked scene / user constraints |
+| Script Doctor | Current screenplay (faqat taklif beradi) |
+| Cinematographer | Locked Style Bible |
+
+Agentlar bir-biriga chat tarixi uzatmaydi. `agents.context_for()` har
+bosqichga faqat kerakli tasdiqlangan kontekstni yig'adi (TZ 15.1) — bu
+token xarajati va gallyutsinatsiyani kamaytiradi.
+
+## Railway'ga joylash
+
+1. GitHub'ga push
+2. Railway'da New Project -> Deploy from GitHub
+3. Variables: `TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY` yoki `OPENAI_API_KEY`
+4. Deploy
+
+`railway.json` va `Procfile` tayyor. Bot polling rejimida ishlaydi,
+web port kerak emas.
+
+⚠️ Railway diski vaqtinchalik — `/data/` qayta deploy'da o'chadi.
+Doimiy saqlash uchun Volume yoki PostgreSQL kerak (TZ 17).
