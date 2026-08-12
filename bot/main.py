@@ -93,61 +93,146 @@ def next_stage(stage: str) -> str | None:
     return ORDER[i + 1] if i + 1 < len(ORDER) else None
 
 
+def _txt(v, limit: int = 0) -> str:
+    """Har qanday qiymatni matnga aylantiradi.
+
+    LLM ro'yxat elementlarini ba'zan oddiy matn, ba'zan obyekt qilib
+    qaytaradi ({"risk": ..., "solution": ...}). Ikkalasi ham to'g'ri —
+    shuning uchun render hech qachon shaklga bog'liq bo'lmasligi kerak.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        out = v
+    elif isinstance(v, (int, float)):
+        out = str(v)
+    elif isinstance(v, dict):
+        # eng ma'noli maydonni tanlaydi
+        for k in ("description", "risk", "issue", "text", "name",
+                  "title", "value", "action", "summary"):
+            if k in v and isinstance(v[k], str):
+                out = v[k]
+                break
+        else:
+            out = "; ".join(f"{k}: {_txt(x)}" for k, x in list(v.items())[:3])
+    elif isinstance(v, (list, tuple)):
+        out = ", ".join(_txt(x) for x in v)
+    else:
+        out = str(v)
+    return out[:limit] if limit and len(out) > limit else out
+
+
+def _num(v, default: float = 0.0) -> float:
+    """LLM raqamni matn qilib qaytarishi mumkin ('45' yoki '45 soniya')."""
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        import re as _re
+        m = _re.search(r"-?\d+(?:\.\d+)?", v)
+        if m:
+            return float(m.group())
+    return default
+
+
+def _items(content: dict, *keys) -> list:
+    """Bir necha mumkin bo'lgan kalitdan birinchi topilgan ro'yxatni oladi.
+
+    LLM 'scenes' o'rniga 'scene_list', 'shots' o'rniga 'shot_list'
+    qaytarishi mumkin.
+    """
+    for k in keys:
+        v = content.get(k)
+        if isinstance(v, list):
+            return v
+        if isinstance(v, dict):
+            return list(v.values())
+    return []
+
+
+TG_LIMIT = 3900   # Telegram chegarasi 4096; zaxira qoldiramiz
+
+
+def _fit(text: str) -> str:
+    """Telegram xabar chegarasi. Haqiqiy ssenariy oson oshib ketadi."""
+    if len(text) <= TG_LIMIT:
+        return text
+    cut = text[:TG_LIMIT]
+    # HTML tegini o'rtasidan kesmaslik uchun oxirgi tugallangan qatorgacha
+    nl = cut.rfind("\n")
+    if nl > TG_LIMIT * 0.6:
+        cut = cut[:nl]
+    return cut + "\n\n<i>… qisqartirildi</i>"
+
+
 def render(stage: str, content: dict) -> str:
     """Bosqich natijasini o'qiladigan matnga aylantiradi."""
     if stage == "producer":
-        risks = content.get("risks") or []
-        return (
-            f"<b>{content.get('title', '—')}</b>\n\n"
-            f"<i>{content.get('logline', '')}</i>\n\n"
-            f"{content.get('synopsis', '')}\n\n"
-            f"Janr: {content.get('genre', '—')}  |  "
-            f"Ohang: {content.get('tone', '—')}\n"
-            f"Mavzu: {content.get('theme', '—')}\n"
-            f"Qahramon: {content.get('protagonist', '—')}\n"
-            f"Maqsad: {content.get('goal', '—')}\n"
-            f"To'siq: {content.get('conflict', '—')}\n"
-            + (f"\n⚠️ Risklar: {', '.join(risks[:4])}" if risks else "")
+        risks = _items(content, "risks", "risk_list")
+        out = (
+            f"<b>{_txt(content.get('title'), 90) or '—'}</b>\n\n"
+            f"<i>{_txt(content.get('logline'), 300)}</i>\n\n"
+            f"{_txt(content.get('synopsis'), 900)}\n\n"
+            f"Janr: {_txt(content.get('genre'), 40) or '—'}  |  "
+            f"Ohang: {_txt(content.get('tone'), 40) or '—'}\n"
+            f"Mavzu: {_txt(content.get('theme'), 90) or '—'}\n"
+            f"Qahramon: {_txt(content.get('protagonist'), 120) or '—'}\n"
+            f"Maqsad: {_txt(content.get('goal'), 150) or '—'}\n"
+            f"To'siq: {_txt(content.get('conflict'), 150) or '—'}"
         )
+        if risks:
+            out += "\n\n⚠️ <b>Risklar</b>"
+            for r in risks[:4]:
+                out += f"\n• {_txt(r, 160)}"
+        return out
     if stage == "screenwriter":
-        sc = content.get("scenes", [])
-        head = f"<b>Ssenariy</b> — {len(sc)} sahna, " \
-               f"{content.get('total_duration', 0):.0f}s\n\n"
-        body = "\n".join(
-            f"<b>{s.get('id')}</b> {s.get('heading', '')} "
-            f"({s.get('duration', 0):.0f}s)\n{s.get('action', '')[:220]}"
-            for s in sc[:8]
+        sc = _items(content, "scenes", "scene_list")
+        head = (f"<b>Ssenariy</b> — {len(sc)} sahna, "
+                f"{_num(content.get('total_duration')):.0f}s\n\n")
+        body = "\n\n".join(
+            f"<b>{_txt(s.get('id'), 12)}</b> "
+            f"{_txt(s.get('heading') or s.get('slugline'), 70)} "
+            f"({_num(s.get('duration')):.0f}s)\n"
+            f"{_txt(s.get('action') or s.get('description'), 220)}"
+            for s in sc[:7] if isinstance(s, dict)
         )
-        more = f"\n\n… yana {len(sc) - 8} sahna" if len(sc) > 8 else ""
+        more = f"\n\n… yana {len(sc) - 7} sahna" if len(sc) > 7 else ""
         return head + body + more
     if stage == "script_doctor":
-        iss = content.get("issues", [])
-        blocker = [i for i in iss if i.get("severity") == "blocker"]
+        iss = _items(content, "issues", "issue_list")
+        blocker = [i for i in iss
+                   if isinstance(i, dict) and i.get("severity") == "blocker"]
         lines = [f"<b>Audit</b> — {len(iss)} ta eslatma"]
         if blocker:
             lines.append(f"🔴 {len(blocker)} ta blocker")
         for i in iss[:6]:
-            lines.append(f"• [{i.get('severity', '?')}] "
-                         f"{i.get('description', '')[:160]}")
-        lines.append(f"\n{content.get('verdict', '')}")
+            sev = i.get("severity", "?") if isinstance(i, dict) else "?"
+            lines.append(f"• [{sev}] {_txt(i, 180)}")
+        v = _txt(content.get("verdict"), 500)
+        if v:
+            lines.append(f"\n{v}")
         return "\n".join(lines)
     if stage == "cinematographer":
-        sh = content.get("shots", [])
-        hard = [s for s in sh
-                if s.get("generation_difficulty") in ("high", "very_high")]
+        sh = _items(content, "shots", "shot_list")
+        hard = [s for s in sh if isinstance(s, dict)
+                and s.get("generation_difficulty") in ("high", "very_high")]
         lines = [f"<b>Kadrlar</b> — {len(sh)} ta, "
-                 f"{content.get('total_duration', 0):.0f}s"]
+                 f"{_num(content.get('total_duration')):.0f}s"]
         if hard:
             lines.append(f"⚠️ {len(hard)} ta kadr qiyin generatsiya")
         for s in sh[:10]:
+            if not isinstance(s, dict):
+                lines.append(f"• {_txt(s, 90)}")
+                continue
             lines.append(
-                f"<b>{s.get('id')}</b> {s.get('duration', 0):.0f}s "
-                f"{s.get('shot_size', '')} — {s.get('action', '')[:90]}"
+                f"<b>{_txt(s.get('id'), 12)}</b> "
+                f"{_num(s.get('duration')):.0f}s "
+                f"{_txt(s.get('shot_size') or s.get('size'), 20)} — "
+                f"{_txt(s.get('action') or s.get('description'), 90)}"
             )
         if len(sh) > 10:
             lines.append(f"… yana {len(sh) - 10} kadr")
         return "\n".join(lines)
-    return str(content)[:3000]
+    return _txt(content, 3000)
 
 
 async def run_stage(msg: Message, proj: dict, stage: str,
@@ -180,10 +265,19 @@ async def run_stage(msg: Message, proj: dict, stage: str,
     store.save(proj)
 
     note = "\n\n<i>demo rejim — kalit ulanmagan</i>" if LLM.name == "demo" else ""
-    await wait.edit_text(
-        render(stage, res.data) + note,
-        parse_mode="HTML", reply_markup=review_kb(stage),
-    )
+    try:
+        await wait.edit_text(
+            _fit(render(stage, res.data) + note),
+            parse_mode="HTML", reply_markup=review_kb(stage),
+        )
+    except Exception as e:
+        # HTML buzilgan bo'lsa formatsiz yuboramiz — natija yo'qolmasin
+        log.warning("render/edit xatosi: %s", e)
+        await wait.edit_text(
+            _fit(render(stage, res.data)).replace("<b>", "").replace("</b>", "")
+            .replace("<i>", "").replace("</i>", ""),
+            reply_markup=review_kb(stage),
+        )
 
 
 def _default_instruction(stage: str, proj: dict) -> str:
@@ -449,7 +543,7 @@ async def back(c: CallbackQuery):
         store.save(proj)
         v = store.current_version(proj, prev)
         if v:
-            await c.message.answer(render(prev, v["content"]),
+            await c.message.answer(_fit(render(prev, v["content"])),
                                    parse_mode="HTML",
                                    reply_markup=review_kb(prev))
     await c.answer()
@@ -464,7 +558,7 @@ async def open_project(c: CallbackQuery):
     stage = proj["stage"]
     v = store.current_version(proj, stage)
     if v:
-        await c.message.answer(render(stage, v["content"]),
+        await c.message.answer(_fit(render(stage, v["content"])),
                                parse_mode="HTML",
                                reply_markup=review_kb(stage))
     else:
