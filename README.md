@@ -101,3 +101,75 @@ undan oldin filmni qo'pol ko'rinishda ko'rib olish shart.
 - Musiqa — litsenziyalangan kutubxona yoki alohida API
 - EDL/XML eksport — tashqi montaj ilovalari uchun
 - Sahnalarga bo'lish — 5 daqiqadan uzun ishlar uchun zarur
+
+---
+
+# v0.2 — TZ integratsiyasi
+
+TZ v1.0 dan to'rtta markaziy narsa yadroga kiritildi.
+
+## Yangi modullar
+
+| Fayl | TZ bo'limi | Vazifasi |
+|---|---|---|
+| `ids.py` | 16 | Immutable ID: SH014 butun pipeline bo'ylab o'zgarmaydi |
+| `versioning.py` | 2.1, 2.4, 18 | Status, versiya tarixi, dependency graph |
+| `ledger.py` | 8.4, 22 | Cost ledger, budget guard, retry cheklovi |
+| `compiler.py` | 8 | Canonical package -> prompt (provayderdan mustaqil) |
+
+## Tuzatilgan xato (v0.1)
+
+Uslub bloki bo'linmas edi va har kadrga to'liq yopishardi. Natijada
+odamsiz kadrga ham "Central Asian people with olive skin" qo'shilardi —
+model esa kadrda yo'q odamni chizishga urinadi.
+
+Endi uslub modullarga bo'lingan. Har kadr faqat o'ziga keraklisini
+oladi:
+
+```python
+compile_prompt(pkg, base, modules, active=[])                  # odamsiz kadr
+compile_prompt(pkg, base, modules, active=["people","interior"])  # odamli
+```
+
+Shuningdek qismiy takror ham olib tashlanadi ("Photographic realism,
+not illustration" + "photographic realism" -> bittasi qoladi).
+
+## Ta'sir hisoboti
+
+O'zgartirishdan OLDIN nima buzilishini ko'rsatadi:
+
+```python
+g = Graph()
+g.link("SC004", "SH014", Impact.FULL_REGEN)
+print(g.preview("SC004", Impact.FULL_REGEN))
+```
+
+Bu foydalanuvchi pulini tejaydi: "bu o'zgarish 14 ta kadrni qayta
+yaratishga majbur qiladi" degan ogohlantirish.
+
+## Generation Difficulty
+
+Generatsiyadan oldin qiyinlikni baholaydi va sababini aytadi:
+
+```python
+assess_difficulty(pkg, action_beats=3, characters=3)
+# -> ("very_high", "12s — 10s dan uzun kadr buziladi; 3 ta harakat...")
+```
+
+## Sinov
+
+```bash
+python3 examples/smoke_test.py
+```
+
+## TZ dan ATAYLAB kiritilmagan
+
+Bular TZ da qolsin, lekin birinchi qurilishga kirmasin:
+
+- Universe / Series / Season / Episode — ma'lumotlar modelini bir necha
+  barobar murakkablashtiradi, MVP'da qiymati nol
+- 19 ta agent — boshida 4 tasi yetadi
+- Easy / Professional / Hybrid uch rejim — bitta rejim
+- Branch va diff — versiya saqlansin, branch keyin
+- QC Supervisor 9 ta audit moduli — MVP'da odam qaraydi
+- To'liq dependency invalidation engine — hozircha oddiy bayroq mantiqi

@@ -93,11 +93,22 @@ class Shot:
 
 @dataclass
 class StyleBible:
-    """Uslub bibliyasi — har bir promptga qo'shiladigan doimiy blok."""
+    """Uslub bibliyasi.
 
-    base: str = ""                          # asosiy uslub bloki
-    grades: dict[str, str] = field(default_factory=dict)  # rang bloklari
-    negative: str = ""                      # qochiladigan narsalar
+    MUHIM: uslub bitta katta blok EMAS. U modullarga bo'linadi.
+
+    `base`    — har kadrda (optika, plyonka, realizm)
+    `modules` — faqat kerakli kadrlarda (odamlar, interyer, va h.k.)
+
+    Sabab: 'Central Asian people' ni kadrda odam yo'q bo'lsa ham yozsangiz,
+    model odam qo'shadi. 'Uzbek architecture' ni cho'l kadriga yozsangiz,
+    model u yerga uy tiqadi. Kadrda yo'q narsani promptda aytmang.
+    """
+
+    base: str = ""                                        # har doim
+    modules: dict[str, str] = field(default_factory=dict)  # tanlab
+    grades: dict[str, str] = field(default_factory=dict)   # rang bloklari
+    negative: str = ""
     aspect: str = "9:16"
     model_image: str = ""
     model_video: str = ""
