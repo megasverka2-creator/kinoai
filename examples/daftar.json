@@ -1,0 +1,238 @@
+{
+  "title": "Daftar",
+  "kind": "film",
+  "target_seconds": 60,
+  "stage": "preproduksiya",
+  "logline": "1938-yilda to'xtagan qo'lyozma daftar avloddan avlodga o'tadi va bugungi bola uning bo'sh sahifasini yozishni boshlaydi.",
+  "script": "(to'liq ssenariy alohida saqlanadi)",
+  "style": {
+    "base": "Vertical 9:16 composition, shot on 35mm film, anamorphic lens, shallow depth of field, natural light only. Central Asian people with warm olive skin, dark almond eyes, broad cheekbones, black hair. Uzbek domestic architecture: sun-dried clay brick, carved wooden doors, patterned cotton textiles. Photographic realism, not illustration",
+    "grades": {
+      "cold": "Desaturated near-monochrome, cold blue-grey shadows, heavy film grain, low contrast, faded highlights",
+      "turn": "Colour returning after monochrome, first warm golden light, soft and hopeful",
+      "warm": "Warm golden colour grade, rich saturation, soft natural highlights, gentle contrast",
+      "bright": "Bright clean daylight, high key, no harsh shadows"
+    },
+    "negative": "no text, not cartoon",
+    "aspect": "9:16",
+    "model_image": "nano_banana_2",
+    "model_video": "seedance_2_0"
+  },
+  "elements": [
+    {
+      "id": "daftar",
+      "name": "a worn handwritten notebook with yellowed paper",
+      "kind": "prop",
+      "ref_id": "",
+      "note": "filmning qahramoni — barcha kadrlarda bir xil"
+    },
+    {
+      "id": "kema",
+      "name": "a large rusted fishing vessel on dry seabed",
+      "kind": "environment",
+      "ref_id": "",
+      "note": "5 va 11-kadrda aynan bir xil rakurs"
+    }
+  ],
+  "shots": [
+    {
+      "n": 1,
+      "scene": "Daftar",
+      "description": "Daftar",
+      "prompt": "A dark room at night. On a low wooden table an open notebook, an inkwell and a single burning candle. Frost on the window behind. Static wide shot, notebook in lower third",
+      "duration": 4,
+      "elements": [
+        "daftar"
+      ],
+      "grade": "cold",
+      "narration": "Bir daftar bor edi. Tugatilmagan.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 2,
+      "scene": "To'xtagan qo'l",
+      "description": "To'xtagan qo'l",
+      "prompt": "Extreme close-up of a weathered hand holding a wooden pen above a half-written page, frozen mid-motion. A thin blade of hard white light falls across the page",
+      "duration": 4,
+      "elements": [
+        "daftar"
+      ],
+      "grade": "cold",
+      "narration": "Uni yozgan qo'l — o'ttiz sakkizinchi yilning kuzida to'xtadi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 3,
+      "scene": "Sham o'chdi",
+      "description": "Sham o'chdi",
+      "prompt": "Total darkness. A single open notebook page catches the last dim light, floating in black emptiness. High angle looking down",
+      "duration": 3,
+      "elements": [
+        "daftar"
+      ],
+      "grade": "cold",
+      "narration": "Daftar qoldi. Yashirindi. Kutdi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 4,
+      "scene": "Paxta",
+      "description": "Paxta",
+      "prompt": "An endless cotton field under a white overexposed sky. In the foreground a child's small hand reaching into a cotton boll. Low camera angle from ground level",
+      "duration": 3,
+      "elements": [],
+      "grade": "cold",
+      "narration": "Yer bir ekinga majbur bo'ldi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 5,
+      "scene": "Orol",
+      "description": "Orol",
+      "prompt": "A large rusted fishing vessel tilted on cracked dry seabed, no water anywhere. Wide shot from below against a pale empty sky",
+      "duration": 3,
+      "elements": [
+        "kema"
+      ],
+      "grade": "cold",
+      "narration": "Dengiz chekindi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 6,
+      "scene": "Til qaytdi",
+      "description": "Til qaytdi",
+      "prompt": "A blank enamel plaque on a plastered school wall, morning sunlight striking it directly. Low angle looking up, deep blue sky above",
+      "duration": 3,
+      "elements": [],
+      "grade": "turn",
+      "narration": "Keyin — til qaytdi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 7,
+      "scene": "Bayroq",
+      "description": "Bayroq",
+      "prompt": "A flag rising on a tall pole seen from directly below against the sun, fabric backlit and glowing. Extreme low angle, lens flare",
+      "duration": 3,
+      "elements": [],
+      "grade": "warm",
+      "narration": "Keyin — nom qaytdi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 8,
+      "scene": "Uzatish",
+      "description": "Uzatish",
+      "prompt": "An elderly wrinkled hand passing a worn notebook into a young open palm. Sunlit courtyard with grapevine canopy blurred behind. Close-up on hands",
+      "duration": 4,
+      "elements": [
+        "daftar"
+      ],
+      "grade": "warm",
+      "narration": "Daftar qo'ldan qo'lga o'tdi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 9,
+      "scene": "Non",
+      "description": "Non",
+      "prompt": "A farmer's dusty calloused hands holding a round flatbread over ripe golden wheat. Medium close shot, warm low sun behind",
+      "duration": 4,
+      "elements": [],
+      "grade": "warm",
+      "narration": "",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 10,
+      "scene": "Yangi avlod",
+      "description": "Yangi avlod",
+      "prompt": "A young woman at a desk at night, face lit only by the cool glow of a screen off-frame, concentrating. The worn notebook lies beside her keyboard",
+      "duration": 4,
+      "elements": [
+        "daftar"
+      ],
+      "grade": "warm",
+      "narration": "Har bir qo'l unga bir satr qo'shdi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 11,
+      "scene": "Orol tiriladi",
+      "description": "Orol tiriladi",
+      "prompt": "The same rusted vessel on dry seabed, now young green saxaul saplings growing around its hull. Ground level looking up past the saplings. Golden hour",
+      "duration": 4,
+      "elements": [
+        "kema"
+      ],
+      "grade": "warm",
+      "narration": "Va eng qora sahifa — yashil bo'la boshladi.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    },
+    {
+      "n": 12,
+      "scene": "Bo'sh sahifa",
+      "description": "Bo'sh sahifa",
+      "prompt": "Looking straight down at a blank notebook page as a child's hand begins to write with a pencil. The pencil tip has just touched the paper",
+      "duration": 5,
+      "elements": [
+        "daftar"
+      ],
+      "grade": "bright",
+      "narration": "Yangi hayot va kelajakni — biz yozamiz.",
+      "source": "empty",
+      "file": "",
+      "still": "",
+      "takes": [],
+      "locked": false
+    }
+  ],
+  "narration_file": "",
+  "music_file": "",
+  "output": ""
+}

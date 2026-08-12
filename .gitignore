@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Maxfiy — HECH QACHON commit qilinmaydi
+.env
+*.key
+credentials.json
+
+# Media natijalari — repoga tushmasin, og'ir
+*.mp4
+*.mov
+*.mkv
+*.wav
+*.mp3
+*.m4a
+/output/
+/media/
+/renders/
+/tmp/
+
+# Tizim
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

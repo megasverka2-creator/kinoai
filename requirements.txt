@@ -1,0 +1,5 @@
+# Yadro uchun tashqi kutubxona KERAK EMAS — faqat Python 3.10+ va FFmpeg.
+# Quyidagilar provayder ulaganda kerak bo'ladi:
+
+# requests>=2.31
+# python-dotenv>=1.0
