@@ -220,6 +220,10 @@ async def cmd_start(m: Message, state: FSMContext):
 
 @dp.message(Command("new"))
 async def cmd_new(m: Message, state: FSMContext):
+    await start_wizard(m, state)
+
+
+async def start_wizard(m: Message, state: FSMContext):
     await state.set_state(Wizard.kind)
     await m.answer("Format tanlang:", reply_markup=kb([
         [("🎥 Film", "kind:film"), ("🎨 Multfilm", "kind:multfilm")],
@@ -229,7 +233,11 @@ async def cmd_new(m: Message, state: FSMContext):
 
 @dp.message(Command("projects"))
 async def cmd_projects(m: Message):
-    ps = store.list_projects(m.from_user.id)
+    await show_projects(m, m.from_user.id)
+
+
+async def show_projects(m: Message, uid: int):
+    ps = store.list_projects(uid)
     if not ps:
         await m.answer("Loyiha yo'q. /new bilan boshlang.")
         return
@@ -241,7 +249,11 @@ async def cmd_projects(m: Message):
 
 @dp.message(Command("status"))
 async def cmd_status(m: Message):
-    p = store.latest(m.from_user.id)
+    await show_status(m, m.from_user.id)
+
+
+async def show_status(m: Message, uid: int):
+    p = store.latest(uid)
     if not p:
         await m.answer("Loyiha yo'q. /new bilan boshlang.")
         return
@@ -260,7 +272,11 @@ async def cmd_status(m: Message):
 
 @dp.message(Command("cost"))
 async def cmd_cost(m: Message):
-    p = store.latest(m.from_user.id)
+    await show_cost(m, m.from_user.id)
+
+
+async def show_cost(m: Message, uid: int):
+    p = store.latest(uid)
     if not p:
         await m.answer("Loyiha yo'q.")
         return
@@ -277,7 +293,11 @@ async def cmd_cost(m: Message):
 
 @dp.message(Command("settings"))
 async def cmd_settings(m: Message):
-    p = store.latest(m.from_user.id)
+    await show_settings(m, m.from_user.id)
+
+
+async def show_settings(m: Message, uid: int):
+    p = store.latest(uid)
     q = p.get("quality", "balanced") if p else "balanced"
     await m.answer(
         f"Sifat rejimi: <b>{q}</b>\nLLM: <b>{LLM.name}</b>",
@@ -463,12 +483,24 @@ async def set_quality(c: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("cmd:"))
 async def menu_route(c: CallbackQuery, state: FSMContext):
+    """Menyu tugmalari.
+
+    MUHIM: callback'dagi c.message.from_user — bu BOT, foydalanuvchi emas.
+    Haqiqiy foydalanuvchi c.from_user da. Shuning uchun uid alohida
+    uzatiladi (aiogram 3 da from_user o'zgarmas).
+    """
     what = c.data.split(":")[1]
-    fn = {"new": cmd_new, "projects": cmd_projects,
-          "status": cmd_status, "cost": cmd_cost,
-          "settings": cmd_settings}[what]
-    c.message.from_user = c.from_user   # komandalar user_id ni shu yerdan oladi
-    await (fn(c.message, state) if what == "new" else fn(c.message))
+    uid = c.from_user.id
+    if what == "new":
+        await start_wizard(c.message, state)
+    elif what == "projects":
+        await show_projects(c.message, uid)
+    elif what == "status":
+        await show_status(c.message, uid)
+    elif what == "cost":
+        await show_cost(c.message, uid)
+    elif what == "settings":
+        await show_settings(c.message, uid)
     await c.answer()
 
 
