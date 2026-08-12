@@ -69,7 +69,8 @@ def review_kb(stage: str) -> InlineKeyboardMarkup:
          ("🔄 Qayta yaratish", f"regen:{stage}")],
         [("📝 Qo'lda kiritish", f"manual:{stage}"),
          ("🕘 Versiyalar", f"vers:{stage}")],
-        [("⬅️ Oldingi bosqich", f"back:{stage}")],
+        [("📄 To'liq matn", f"full:{stage}"),
+         ("⬅️ Oldingi bosqich", f"back:{stage}")],
     ])
 
 
@@ -120,6 +121,38 @@ def _txt(v, limit: int = 0) -> str:
     else:
         out = str(v)
     return out[:limit] if limit and len(out) > limit else out
+
+
+def _pick(d: dict, *keys, default=None):
+    """Bir necha mumkin bo'lgan kalitdan birinchi topilganini oladi.
+
+    LLM 'duration' o'rniga 'duration_seconds', 'estimated_duration',
+    'length' qaytarishi mumkin. Har birini qattiq kutish — xato manbai.
+    """
+    if not isinstance(d, dict):
+        return default
+    for k in keys:
+        if k in d and d[k] not in (None, "", []):
+            return d[k]
+    return default
+
+
+def _total(content: dict, items: list) -> float:
+    """Jami davomiylik. LLM bermasa — elementlardan yig'iladi."""
+    t = _num(_pick(content, "total_duration", "total_duration_seconds",
+                   "runtime", "total_runtime"))
+    if t:
+        return t
+    return sum(_dur(i) for i in items if isinstance(i, dict))
+
+
+DURATION_KEYS = ("duration", "duration_seconds", "duration_sec",
+                 "estimated_duration", "estimated_duration_seconds",
+                 "length", "length_seconds", "seconds", "davomiylik")
+
+
+def _dur(d: dict) -> float:
+    return _num(_pick(d, *DURATION_KEYS))
 
 
 def _num(v, default: float = 0.0) -> float:
@@ -187,12 +220,12 @@ def render(stage: str, content: dict) -> str:
     if stage == "screenwriter":
         sc = _items(content, "scenes", "scene_list")
         head = (f"<b>Ssenariy</b> — {len(sc)} sahna, "
-                f"{_num(content.get('total_duration')):.0f}s\n\n")
+                f"{_total(content, sc):.0f}s\n\n")
         body = "\n\n".join(
             f"<b>{_txt(s.get('id'), 12)}</b> "
-            f"{_txt(s.get('heading') or s.get('slugline'), 70)} "
-            f"({_num(s.get('duration')):.0f}s)\n"
-            f"{_txt(s.get('action') or s.get('description'), 220)}"
+            f"{_txt(_pick(s, 'heading', 'slugline', 'scene_heading', 'location'), 70)} "
+            f"({_dur(s):.0f}s)\n"
+            f"{_txt(_pick(s, 'action', 'description', 'action_description', 'text'), 260)}"
             for s in sc[:7] if isinstance(s, dict)
         )
         more = f"\n\n… yana {len(sc) - 7} sahna" if len(sc) > 7 else ""
@@ -214,9 +247,10 @@ def render(stage: str, content: dict) -> str:
     if stage == "cinematographer":
         sh = _items(content, "shots", "shot_list")
         hard = [s for s in sh if isinstance(s, dict)
-                and s.get("generation_difficulty") in ("high", "very_high")]
+                and _txt(_pick(s, "generation_difficulty", "difficulty"))
+                in ("high", "very_high")]
         lines = [f"<b>Kadrlar</b> — {len(sh)} ta, "
-                 f"{_num(content.get('total_duration')):.0f}s"]
+                 f"{_total(content, sh):.0f}s"]
         if hard:
             lines.append(f"⚠️ {len(hard)} ta kadr qiyin generatsiya")
         for s in sh[:10]:
@@ -225,9 +259,9 @@ def render(stage: str, content: dict) -> str:
                 continue
             lines.append(
                 f"<b>{_txt(s.get('id'), 12)}</b> "
-                f"{_num(s.get('duration')):.0f}s "
-                f"{_txt(s.get('shot_size') or s.get('size'), 20)} — "
-                f"{_txt(s.get('action') or s.get('description'), 90)}"
+                f"{_dur(s):.0f}s "
+                f"{_txt(_pick(s, 'shot_size', 'size', 'framing'), 20)} — "
+                f"{_txt(_pick(s, 'action', 'description', 'action_description'), 90)}"
             )
         if len(sh) > 10:
             lines.append(f"… yana {len(sh) - 10} kadr")
@@ -527,6 +561,114 @@ async def versions(c: CallbackQuery):
                      + (f" · {v['note'][:40]}" if v.get("note") else ""))
     await c.message.answer("\n".join(lines), parse_mode="HTML")
     await c.answer()
+
+
+def full_text(stage: str, content: dict) -> str:
+    """Qisqartirishsiz to'liq matn. Xabarlarga bo'lib yuboriladi."""
+    if stage == "screenwriter":
+        sc = _items(content, "scenes", "scene_list")
+        out = []
+        for s in sc:
+            if not isinstance(s, dict):
+                out.append(_txt(s))
+                continue
+            out.append(
+                f"<b>{_txt(_pick(s, 'id'), 12)}</b> "
+                f"{_txt(_pick(s, 'heading', 'slugline', 'scene_heading'), 90)}"
+                f"  ({_dur(s):.0f}s)\n"
+                f"{_txt(_pick(s, 'action', 'description', 'action_description'))}"
+            )
+            dlg = _items(s, "dialogue", "dialog", "lines")
+            for d in dlg:
+                if isinstance(d, dict):
+                    who = _txt(_pick(d, "character", "speaker", "name"), 40)
+                    line = _txt(_pick(d, "line", "text", "dialogue"))
+                    out.append(f"   <b>{who}</b>: {line}")
+                else:
+                    out.append(f"   {_txt(d)}")
+        return "\n\n".join(out)
+    if stage == "cinematographer":
+        sh = _items(content, "shots", "shot_list")
+        out = []
+        for s in sh:
+            if not isinstance(s, dict):
+                out.append(_txt(s))
+                continue
+            diff = _txt(_pick(s, "generation_difficulty", "difficulty"), 12)
+            mark = " ⚠️" if diff in ("high", "very_high") else ""
+            out.append(
+                f"<b>{_txt(_pick(s, 'id'), 12)}</b>{mark}  {_dur(s):.0f}s  "
+                f"{_txt(_pick(s, 'scene', 'scene_id'), 12)}\n"
+                f"{_txt(_pick(s, 'shot_size', 'size', 'framing'), 30)} · "
+                f"{_txt(_pick(s, 'angle'), 30)} · "
+                f"{_txt(_pick(s, 'movement', 'camera_movement'), 40)}\n"
+                f"{_txt(_pick(s, 'action', 'description'))}"
+                + (f"\n<i>qiyinlik: {diff} — "
+                   f"{_txt(_pick(s, 'difficulty_reason', 'reason'), 120)}</i>"
+                   if mark else "")
+            )
+        return "\n\n".join(out)
+    if stage == "script_doctor":
+        iss = _items(content, "issues", "issue_list")
+        out = []
+        for i in iss:
+            if isinstance(i, dict):
+                out.append(
+                    f"[{_txt(_pick(i, 'severity'), 12)}] "
+                    f"{_txt(_pick(i, 'scene', 'scene_id'), 12)}\n"
+                    f"{_txt(_pick(i, 'description', 'issue', 'problem'))}\n"
+                    f"<i>{_txt(_pick(i, 'recommendation', 'fix', 'solution'))}</i>"
+                )
+            else:
+                out.append(_txt(i))
+        out.append(_txt(_pick(content, "verdict")))
+        return "\n\n".join(x for x in out if x)
+    if stage == "producer":
+        out = []
+        for k, v in content.items():
+            out.append(f"<b>{k}</b>: {_txt(v)}")
+        return "\n\n".join(out)
+    return _txt(content)
+
+
+def chunks(text: str, size: int = TG_LIMIT) -> list[str]:
+    """Uzun matnni xabarlarga bo'ladi — qatorlar o'rtasidan kesmaydi."""
+    out, cur = [], ""
+    for para in text.split("\n\n"):
+        if len(cur) + len(para) + 2 > size:
+            if cur:
+                out.append(cur)
+            cur = para[:size]
+        else:
+            cur = f"{cur}\n\n{para}" if cur else para
+    if cur:
+        out.append(cur)
+    return out or [""]
+
+
+@dp.callback_query(F.data.startswith("full:"))
+async def show_full(c: CallbackQuery):
+    stage = c.data.split(":")[1]
+    proj = store.latest(c.from_user.id)
+    if not proj:
+        await c.answer("Loyiha topilmadi", show_alert=True)
+        return
+    v = store.current_version(proj, stage)
+    if not v:
+        await c.answer("Natija yo'q", show_alert=True)
+        return
+    await c.answer()
+    parts = chunks(full_text(stage, v["content"]))
+    for i, part in enumerate(parts):
+        try:
+            await c.message.answer(part, parse_mode="HTML")
+        except Exception:
+            plain = part
+            for t in ("<b>", "</b>", "<i>", "</i>"):
+                plain = plain.replace(t, "")
+            await c.message.answer(plain)
+        if i < len(parts) - 1:
+            await asyncio.sleep(0.4)
 
 
 @dp.callback_query(F.data.startswith("back:"))
