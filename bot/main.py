@@ -24,7 +24,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 
-from kinoai import agents, store
+from kinoai import agents, bible, chain, grammar, presets, store
 from kinoai.providers.text import ProviderError, from_env
 
 logging.basicConfig(level=logging.INFO,
@@ -295,10 +295,30 @@ async def run_stage(msg: Message, proj: dict, stage: str,
     elif stage == "screenwriter":
         proj["screenplay"] = res.data
     elif stage == "cinematographer":
-        proj["shots"] = res.data.get("shots", [])
+        raw = _items(res.data, "shots", "shot_list")
+        raw = [s for s in raw if isinstance(s, dict)]
+        # Kadr grammatikasi: bir xil planlar va teng davomiylikni tuzatadi.
+        # AI qayta chaqirilmaydi — bu bepul tuzatish.
+        fixed, issues = grammar.apply(
+            raw, float(proj.get("target_seconds", 0)),
+            proj.get("rhythm") or None)
+        # Zanjir: qaysi kadr oldingisining oxiridan boshlanadi
+        fixed = chain.plan_chain(fixed)
+        proj["shots"] = fixed
+        res.data["shots"] = fixed
+        if issues:
+            proj["grammar_fixes"] = issues
+            log.info("grammatika tuzatildi: %s", issues)
     store.save(proj)
 
     note = "\n\n<i>demo rejim — kalit ulanmagan</i>" if LLM.name == "demo" else ""
+    if stage == "cinematographer":
+        n_chain, saved = chain.savings(proj.get("shots", []))
+        if n_chain:
+            note += (f"\n\n🔗 {n_chain} ta kadr oldingisining oxiridan "
+                     f"ulanadi — o'tishlar tabiiy, ${saved:.2f} tejaladi")
+        if fixes := proj.get("grammar_fixes"):
+            note += f"\n✏️ {len(fixes)} ta montaj muammosi avtomatik tuzatildi"
     try:
         await wait.edit_text(
             _fit(render(stage, res.data) + note),
@@ -352,11 +372,14 @@ async def cmd_new(m: Message, state: FSMContext):
 
 
 async def start_wizard(m: Message, state: FSMContext):
+    """Natija bo'yicha tanlov.
+
+    Foydalanuvchi "Fast Mode / Professional Mode" emas, NIMA
+    yaratayotganini tanlaydi. Texnik parametrlarni preset o'zi belgilaydi.
+    """
     await state.set_state(Wizard.kind)
-    await m.answer("Format tanlang:", reply_markup=kb([
-        [("🎥 Film", "kind:film"), ("🎨 Multfilm", "kind:multfilm")],
-        [("📱 Reels / Shorts", "kind:shorts"), ("📺 Reklama", "kind:ad")],
-    ]))
+    await m.answer("Nima yaratmoqchisiz?",
+                   reply_markup=kb(presets.keyboard_rows()))
 
 
 @dp.message(Command("projects"))
@@ -443,6 +466,45 @@ async def cmd_export(m: Message):
 
 # ------------------------------------------------------------------ wizard
 
+@dp.callback_query(F.data.startswith("preset:"))
+async def pick_preset(c: CallbackQuery, state: FSMContext):
+    key = c.data.split(":")[1]
+    p = presets.get(key)
+    await state.update_data(preset=key)
+
+    if p.reuse_bible:
+        bs = bible.list_bibles(c.from_user.id)
+        if bs:
+            rows = [[(b["name"], f"bib:{b['id']}")] for b in bs[:6]]
+            rows.append([("➕ Yangi personajlar bilan", "bib:new")])
+            await c.message.edit_text(
+                presets.describe(p) + "\n\nQaysi personajlar bilan?",
+                parse_mode="HTML", reply_markup=kb(rows))
+            await c.answer()
+            return
+
+    await state.set_state(Wizard.idea)
+    await c.message.edit_text(
+        presets.describe(p)
+        + "\n\n<b>G'oyangizni yozing.</b>\n"
+          "Bir jumla ham yetadi. Qanchalik aniq yozsangiz, "
+          "natija shunchalik yaqin bo'ladi.",
+        parse_mode="HTML")
+    await c.answer()
+
+
+@dp.callback_query(F.data.startswith("bib:"))
+async def pick_bible(c: CallbackQuery, state: FSMContext):
+    bid = c.data.split(":")[1]
+    await state.update_data(bible=None if bid == "new" else bid)
+    await state.set_state(Wizard.idea)
+    await c.message.edit_text(
+        "<b>Epizod g'oyasini yozing.</b>\n"
+        "Personajlar oldingi loyihadan olinadi — faqat yangi voqeani "
+        "tasvirlang.", parse_mode="HTML")
+    await c.answer()
+
+
 @dp.callback_query(F.data.startswith("kind:"))
 async def pick_kind(c: CallbackQuery, state: FSMContext):
     await state.update_data(kind=c.data.split(":")[1])
@@ -474,10 +536,22 @@ async def pick_length(c: CallbackQuery, state: FSMContext):
 async def got_idea(m: Message, state: FSMContext):
     data = await state.get_data()
     await state.clear()
-    proj = store.new_project(
-        m.from_user.id, data.get("kind", "film"), data.get("length", 60)
-    )
+    p = presets.get(data.get("preset", "ad"))
+
+    proj = store.new_project(m.from_user.id, p.key, p.runtime,
+                             aspect=p.aspect, mode=p.mode)
     proj["idea"] = m.text
+    proj["preset"] = p.key
+    proj["shot_count"] = p.shots
+    proj["resolution"] = p.resolution
+    proj["audio"] = p.audio
+    proj["rhythm"] = p.rhythm
+    proj["wants_video"] = p.video
+    if bid := data.get("bible"):
+        b = bible.load(m.from_user.id, bid)
+        if b:
+            proj["bible_id"] = bid
+            proj["locked_continuity"] = bible.as_context(b)
     store.save(proj)
     await run_stage(m, proj, "producer")
 

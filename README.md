@@ -243,3 +243,82 @@ web port kerak emas.
 
 ⚠️ Railway diski vaqtinchalik — `/data/` qayta deploy'da o'chadi.
 Doimiy saqlash uchun Volume yoki PostgreSQL kerak (TZ 17).
+
+---
+
+# v0.4 — Montaj sifati va serial
+
+Test videosidan chiqqan uchta muammo hal qilindi. Hammasi
+**qo'shimcha xarajatsiz** — faqat prompt va kod.
+
+## Yangi modullar
+
+| Fayl | Vazifasi |
+|---|---|
+| `presets.py` | Natija bo'yicha tanlov (Reels, Reklama, Multfilm, Serial, Storyboard) |
+| `grammar.py` | Kadr grammatikasi va davomiylik taqsimoti |
+| `chain.py` | Oxirgi freym ulanishi |
+| `bible.py` | Serial uchun qayta ishlatiladigan continuity |
+| `docs/fast_plan_prompt_v2.md` | Yangilangan planning prompt (har qanday tilga) |
+
+## Muammo 1 — bir xil kadrlar
+
+Test videosida 4 kadr ham bir xil: ko'z darajasi, uch personaj o'rtada.
+Sabab: promptda kadr grammatikasi yo'q edi, model esa o'zi tanlaganda
+har doim "xavfsiz" o'rtacha planni beradi.
+
+```python
+fixed, issues = grammar.apply(shots, runtime, rhythm)
+```
+
+AI qoidani buzsa qayta chaqirilmaydi — avtomatik tuzatiladi. Bepul.
+
+## Muammo 2 — teng davomiylik
+
+Har kadr aynan 5.000s edi. Bu `runtime / shot_count` formulasidan
+kelib chiqqan va slaydshou ritmini beradi.
+
+Endi davomiylik plan o'lchamiga qarab taqsimlanadi: umumiy plan
+uzunroq (makonni o'qish uchun vaqt kerak), yaqin plan qisqaroq
+(hissiyot tez o'qiladi).
+
+## Muammo 3 — ulanmagan kadrlar
+
+Har kadr faqat START rasmdan yaratilgan edi, ya'ni 2-kadr 1-kadrning
+qayerda tugaganini bilmasdi.
+
+```python
+shots = chain.plan_chain(shots)          # kim kimdan ulanadi
+img = chain.last_frame(prev_video, out)  # oxirgi freymni ajratish
+```
+
+Xarajat **manfiy**: zanjirlangan kadrlar uchun rasm generatsiya
+qilinmaydi.
+
+⚠️ Zanjir ishlatilsa kadrlar parallel yaratilmaydi — SH002 SH001
+tugashini kutadi. Bir sahna ichida ketma-ket, sahnalar orasida parallel.
+
+## Serial
+
+TZ dagi Universe/Series/Season/Episode iyerarxiyasi **qurilmadi** —
+u ma'lumotlar modelini bir necha barobar murakkablashtiradi.
+
+O'rniga: `continuity` blokini loyihadan ajratib saqlash.
+
+```python
+b = bible.create(uid, "Malika va Bobo Karim", proj["continuity"])
+ctx = bible.as_context(b)   # planning call'ga o'zgarmas beriladi
+```
+
+Yangi epizodda personajlar bir xil qoladi, ssenariy yangi bo'ladi.
+
+## PHP tizimi uchun
+
+`docs/fast_plan_prompt_v2.md` — sof matn, to'g'ridan-to'g'ri
+ko'chiriladi. Grammatika va zanjir mantiqini ham PHP'da takrorlash
+oson: qo'shni bir xil o'lchamni almashtirish, davomiylikni qayta
+taqsimlash, va:
+
+```bash
+ffmpeg -y -ss <duration-0.12> -i prev.mp4 -frames:v 1 -q:v 2 start.jpg
+```
