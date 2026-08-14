@@ -322,3 +322,70 @@ taqsimlash, va:
 ```bash
 ffmpeg -y -ss <duration-0.12> -i prev.mp4 -frames:v 1 -q:v 2 start.jpg
 ```
+
+---
+
+# v0.5 — To'liq mustaqil quvur
+
+Bot endi g'oyadan tayyor videogacha o'zi boradi.
+
+```
+g'oya → konsept → ssenariy → audit → kadrlar
+      → START rasmlar → video → montaj → MP4
+```
+
+## Zanjir — asosiy farq
+
+Oddiy tizim har kadr uchun alohida rasm yaratadi va kadrlarni parallel
+generatsiya qiladi. Tez, lekin kadrlar bir-biriga ulanmaydi.
+
+Bu yerda:
+
+- **bir sahna ichida ketma-ket** — har kadr oldingisining oxirgi
+  freymidan boshlanadi
+- **sahnalar orasida parallel** — ular baribir uzilishi kerak
+
+5 kadrli sinov natijasi:
+
+```
+SH001 SC001  wide           4.8s  generate
+SH002 SC001  close          3.4s  chain <- SH001
+SH003 SC001  medium         4.0s  chain <- SH002
+SH004 SC002  extreme_close  3.0s  generate
+SH005 SC002  wide           4.8s  chain <- SH004
+```
+
+5 kadr uchun 5 emas, **2 ta rasm** generatsiya qilinadi.
+
+## Xarajat darvozalari
+
+Ikkita to'xtash nuqtasi bor va ikkalasi ham majburiy:
+
+1. Rasmlardan **oldin** — arzon, taxminiy narx ko'rsatiladi
+2. Videodan **oldin** — qimmat, foydalanuvchi rasmlarni ko'rgach tasdiqlaydi
+
+## Demo rejim
+
+`FAL_API_KEY` bo'sh bo'lsa FFmpeg placeholder yasaydi. Butun quvur —
+rasm, zanjir, video, montaj — **bir tiyinsiz** sinaladi.
+
+```bash
+python -m bot.main    # TELEGRAM_BOT_TOKEN yetarli
+```
+
+## ⚠️ Model ID lari
+
+`FAL_IMAGE_MODEL` va `FAL_VIDEO_MODEL` — ENV orqali. Standart qiymatlar
+taxminiy; **ishlatishdan oldin provayder hujjatidan tekshiring**.
+Ular tez-tez o'zgaradi.
+
+## ⚠️ Rasm yuklash
+
+Video provayderiga START rasm **public URL** sifatida kerak. Hozir
+lokal fayl data URI qilib yuboriladi — kichik rasmlar uchun ishlaydi,
+lekin ishonchli emas. Ishlab chiqarish uchun R2/S3 kerak.
+
+## Serial
+
+Video tayyor bo'lgach bot Bible saqlashni taklif qiladi. Keyingi
+loyihada "📖 Serial epizodi" tanlansa, o'sha personajlar ishlatiladi.

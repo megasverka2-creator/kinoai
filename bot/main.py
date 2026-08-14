@@ -24,7 +24,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 
-from kinoai import agents, bible, chain, grammar, presets, store
+from kinoai import agents, bible, chain, grammar, pipeline, presets, store
+from kinoai.providers.media import from_env as media_from_env
 from kinoai.providers.text import ProviderError, from_env
 
 logging.basicConfig(level=logging.INFO,
@@ -32,6 +33,7 @@ logging.basicConfig(level=logging.INFO,
 log = logging.getLogger("studio")
 
 LLM = from_env()
+MEDIA, UPLOADER = media_from_env()
 
 # TZ 3 — pipeline bosqichlari (MVP: 1-3 + 8)
 FLOW = [
@@ -583,14 +585,161 @@ async def approve(c: CallbackQuery):
 
     nxt = next_stage(stage)
     if nxt is None:
-        await c.message.answer(
-            "🎉 MVP bosqichlari tugadi.\n\n"
-            "Keyingi fazalar: storyboard, video generatsiya, ovoz, "
-            "montaj (TZ 9–16).", reply_markup=MENU)
+        await start_production(c.message, proj)
         return
     await c.message.answer(f"➡️ Keyingi bosqich: <b>{TITLES[nxt]}</b>",
                            parse_mode="HTML")
     await run_stage(c.message, proj, nxt)
+
+
+async def start_production(m: Message, proj: dict) -> None:
+    """Kadrlar tasdiqlangach — rasm bosqichi va xarajat darvozasi."""
+    shots = proj.get("shots") or []
+    if not shots:
+        await m.answer("Kadrlar ro'yxati bo'sh.")
+        return
+
+    shots = chain.plan_chain(shots)
+    proj["shots"] = shots
+    store.save(proj)
+
+    est = pipeline.estimate(shots, MEDIA,
+                            wants_video=proj.get("wants_video", True))
+    txt = (f"🖼 <b>Rasm bosqichi</b>\n\n"
+           f"{est['images']} ta START rasm yaratiladi.\n")
+    if est["chained"]:
+        txt += (f"🔗 {est['chained']} ta kadr oldingisining oxirgi "
+                f"freymidan ulanadi — rasm kerak emas, "
+                f"${est['saved']:.2f} tejaladi.\n")
+    txt += f"\nRasm xarajati: ~${est['image_cost']:.2f}"
+    if MEDIA.name == "demo":
+        txt += "\n\n<i>demo rejim — haqiqiy generatsiya yo'q</i>"
+
+    await m.answer(txt, parse_mode="HTML", reply_markup=kb([
+        [("🖼 Rasmlarni yaratish", "prod:images")],
+        [("⬅️ Kadrlarni qayta ko'rish", "back:cinematographer")],
+    ]))
+
+
+@dp.callback_query(F.data == "prod:images")
+async def prod_images(c: CallbackQuery):
+    proj = store.latest(c.from_user.id)
+    if not proj:
+        await c.answer("Loyiha topilmadi", show_alert=True)
+        return
+    await c.answer("Boshlandi")
+
+    shots = proj["shots"]
+    wd = f"/tmp/kino/{c.from_user.id}/{proj['id']}"
+    wait = await c.message.answer("⏳ Rasmlar yaratilmoqda…")
+
+    res = await asyncio.to_thread(
+        pipeline.run_storyboard, shots, proj.get("continuity", {}),
+        proj.get("aspect", "16:9"), MEDIA, wd)
+
+    proj["images"] = res.images
+    store.add_cost(proj, "images", MEDIA.name, res.cost)
+    store.save(proj)
+
+    msg = f"✅ {len(res.images)} ta rasm tayyor (${res.cost:.2f})"
+    if res.errors:
+        msg += f"\n⚠️ {len(res.errors)} ta xato"
+
+    if not proj.get("wants_video", True):
+        await wait.edit_text(msg + "\n\n🖼 Storyboard tayyor.")
+        return
+
+    est = pipeline.estimate(shots, MEDIA)
+    await wait.edit_text(
+        f"{msg}\n\n🎬 <b>Video bosqichi</b>\n"
+        f"{est['seconds']:.0f} soniya · {proj.get('resolution', '480p')}\n"
+        f"Taxminiy xarajat: <b>~${est['video_cost']:.2f}</b>\n\n"
+        f"<i>Bu bosqich {len(shots) * 4}–{len(shots) * 8} daqiqa oladi. "
+        f"Har kadr tayyor bo'lganda yuboraman.</i>",
+        parse_mode="HTML", reply_markup=kb([
+            [(f"🎬 Videoni yaratish (~${est['video_cost']:.2f})",
+              "prod:video")],
+            [("🔄 Rasmlarni qayta yaratish", "prod:images")],
+        ]))
+
+
+@dp.callback_query(F.data == "prod:video")
+async def prod_video(c: CallbackQuery):
+    proj = store.latest(c.from_user.id)
+    if not proj:
+        await c.answer("Loyiha topilmadi", show_alert=True)
+        return
+    await c.answer("Boshlandi")
+
+    shots = proj["shots"]
+    wd = f"/tmp/kino/{c.from_user.id}/{proj['id']}"
+    await c.message.answer(
+        f"🎥 {len(shots)} ta kadr generatsiyaga yuborildi.\n"
+        f"Bir sahna ichida ketma-ket ishlaydi — zanjir shuni talab qiladi.")
+
+    res = await asyncio.to_thread(
+        pipeline.run_video, shots, proj.get("images", {}),
+        proj.get("aspect", "16:9"), proj.get("resolution", "480p"),
+        proj.get("audio", True), MEDIA, UPLOADER, wd)
+
+    proj["videos"] = res.videos
+    store.add_cost(proj, "video", MEDIA.name, res.cost)
+    store.save(proj)
+
+    if not res.videos:
+        await c.message.answer(
+            f"❌ Video yaratilmadi.\n"
+            + "\n".join(res.errors[:3]))
+        return
+
+    await c.message.answer(
+        f"✅ {len(res.videos)} ta kadr tayyor (${res.cost:.2f})\n"
+        f"✂️ Montaj boshlandi…")
+
+    try:
+        out = await asyncio.to_thread(
+            pipeline.assemble, shots, res.videos,
+            f"{wd}/final.mp4", proj.get("aspect", "16:9"))
+    except Exception as e:
+        await c.message.answer(f"❌ Montaj xatosi: {e}")
+        return
+
+    proj["final"] = out
+    store.save(proj)
+
+    try:
+        from aiogram.types import FSInputFile
+        await c.message.answer_video(
+            FSInputFile(out),
+            caption=(f"🎬 <b>{proj.get('concept', {}).get('title', 'Tayyor')}"
+                     f"</b>\n\nJami xarajat: ${store.total_cost(proj):.2f}"),
+            parse_mode="HTML")
+    except Exception as e:
+        log.warning("video yuborish: %s", e)
+        await c.message.answer(f"✅ Tayyor: {out}")
+
+    # Bible taklifi — serial uchun
+    if proj.get("continuity") and not proj.get("bible_id"):
+        await c.message.answer(
+            "📖 Bu personajlar bilan davom etmoqchimisiz?",
+            reply_markup=kb([[("Bible sifatida saqlash", "bib:save")]]))
+
+
+@dp.callback_query(F.data == "bib:save")
+async def save_bible(c: CallbackQuery):
+    proj = store.latest(c.from_user.id)
+    if not proj or not proj.get("continuity"):
+        await c.answer("Continuity yo'q", show_alert=True)
+        return
+    b = bible.create(c.from_user.id,
+                     proj.get("concept", {}).get("title", "Bible"),
+                     proj["continuity"], proj["id"])
+    proj["bible_id"] = b["id"]
+    store.save(proj)
+    await c.message.answer(
+        bible.summary(b) + "\n\n<i>Endi /new da \"Serial epizodi\" "
+        "tanlab davom etishingiz mumkin.</i>", parse_mode="HTML")
+    await c.answer("Saqlandi")
 
 
 @dp.callback_query(F.data.startswith("regen:"))
